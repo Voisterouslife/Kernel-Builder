@@ -1,4 +1,5 @@
 name: Universal Kernel Builder
+run-name: Universal Kernel Builder (Build #${{ github.run_number }})
 
 on:
   workflow_dispatch:
@@ -15,6 +16,9 @@ on:
         type: boolean
   repository_dispatch:
     types: [upstream_update]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   prepare-matrix:
@@ -57,7 +61,7 @@ jobs:
           sudo apt-get install -y build-essential git libncurses5-dev bc bison flex libssl-dev p7zip-full lz4 cpio curl libelf-dev dwarves ccache jq lld patch
 
       - id: cache-toolchain
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: prebuilts
           key: ${{ runner.os }}-toolchain-${{ matrix.device.device_name }}-${{ hashFiles('builder-scripts/configs/devices.json') }}
@@ -157,7 +161,7 @@ jobs:
           cd ..
           rm -rf base-repo
 
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@v2
         with:
           repository: ${{ matrix.device.release_repo }}
           files: release-files/*
