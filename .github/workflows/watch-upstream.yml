@@ -59,6 +59,11 @@ jobs:
           
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 【修复】拉取云端代码前，强行丢弃本地因为探测而产生的临时文件或修改
+          git checkout -- . || true
+          git clean -fd
+          
           git pull --rebase
           
           [ ! -f "$STATE_FILE" ] && echo "{}" > "$STATE_FILE"
