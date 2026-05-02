@@ -5,6 +5,9 @@ on:
     - cron: '0 */24 * * *' 
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   discover-and-update:
     runs-on: ubuntu-latest
@@ -60,10 +63,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 【修复】拉取云端代码前，强行丢弃本地因为探测而产生的临时文件或修改
           git checkout -- . || true
           git clean -fd
-          
           git pull --rebase
           
           [ ! -f "$STATE_FILE" ] && echo "{}" > "$STATE_FILE"
@@ -91,10 +92,8 @@ jobs:
           body=$(echo "$response" | sed '$d')
           
           if [ "$http_code" -ne 204 ]; then
-            echo "API 请求失败！"
-            echo "HTTP 状态码: $http_code"
-            echo "返回信息: $body"
+            echo "API Request Failed!"
+            echo "HTTP Code: $http_code"
+            echo "Response: $body"
             exit 1
-          else
-            echo "成功触发 build.yml！"
           fi
