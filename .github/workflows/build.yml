@@ -1,5 +1,5 @@
 name: Universal Kernel Builder
-run-name: Universal Kernel Builder (Build #${{ github.run_number }})
+run-name: Universal Kernel Builder Build #${{ github.run_number }}
 
 on:
   workflow_dispatch:
