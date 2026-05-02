@@ -1,0 +1,174 @@
+name: Universal Kernel Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Create and upload Release'
+        required: false
+        default: false
+        type: boolean
+      is_pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+  repository_dispatch:
+    types: [upstream_update]
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      devices: ${{ steps.set-matrix.outputs.devices }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: set-matrix
+        run: echo "devices=$(cat configs/devices.json | jq -c '.')" >> $GITHUB_OUTPUT
+
+  build:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false 
+      matrix:
+        device: ${{ fromJSON(needs.prepare-matrix.outputs.devices) }}
+        variation:
+          - { branch: "main", name: "Original", enable_sukisuultra: "false", enable_resukisu: "false" }
+          - { branch: "SukiSU", name: "SukiSU-Ultra", enable_sukisuultra: "true", enable_resukisu: "false" }
+          - { branch: "SukiSU", name: "ReSukiSU", enable_sukisuultra: "false", enable_resukisu: "true" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.device.kernel_repo }}
+          ref: ${{ matrix.variation.branch }} 
+          fetch-depth: 1
+
+      - uses: actions/checkout@v4
+        with:
+          path: 'builder-scripts'
+          fetch-depth: 1
+
+      - name: Setup environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git libncurses5-dev bc bison flex libssl-dev p7zip-full lz4 cpio curl libelf-dev dwarves ccache jq lld patch
+
+      - id: cache-toolchain
+        uses: actions/cache@v3
+        with:
+          path: prebuilts
+          key: ${{ runner.os }}-toolchain-${{ matrix.device.device_name }}-${{ hashFiles('builder-scripts/configs/devices.json') }}
+
+      - if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        name: Setup toolchain
+        run: |
+          wget "${{ matrix.device.toolchain_url_1 }}" -O toolchain.tar.gz.00
+          if [ -n "${{ matrix.device.toolchain_url_2 }}" ]; then
+            wget "${{ matrix.device.toolchain_url_2 }}" -O toolchain.tar.gz.01
+            cat toolchain.tar.gz.00 toolchain.tar.gz.01 > toolchain.tar.gz
+            rm -f toolchain.tar.gz.00 toolchain.tar.gz.01
+          else
+            mv toolchain.tar.gz.00 toolchain.tar.gz
+          fi
+          tar -xzf toolchain.tar.gz
+          rm -f toolchain.tar.gz
+
+      - name: Setup Ccache
+        run: |
+          export CCACHE_DIR=~/.ccache
+          export CCACHE_COMPRESS=1
+          export CCACHE_MAXSIZE=15G
+          ccache -M 15G
+          ccache -z 
+
+      - name: Setup Kernel Mods
+        run: |
+          if [ "${{ matrix.variation.enable_sukisuultra }}" == "true" ]; then
+            curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
+          elif [ "${{ matrix.variation.enable_resukisu }}" == "true" ]; then
+            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+          fi
+          
+          if [ "${{ matrix.device.need_baseband_guard }}" == "true" ]; then
+            wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
+          fi
+
+      - name: Build Kernel
+        env:
+          CLANG_VERSION: ${{ matrix.device.clang_version }}
+          DEFCONFIG: ${{ matrix.device.defconfig }}
+          LOCALVERSION: ${{ matrix.device.localversion }}
+          ANYKERNEL_REPO: ${{ matrix.device.anykernel_repo }}
+          ZIP_PREFIX: ${{ matrix.device.zip_prefix }}
+          KERNEL_IMAGE_NAME: ${{ matrix.device.kernel_image_name }}
+          IS_BOOT_LZ4: ${{ matrix.device.is_boot_lz4 }}
+          ENABLE_SUKISU_ULTRA: ${{ matrix.variation.enable_sukisuultra }}
+          ENABLE_RESUKISU: ${{ matrix.variation.enable_resukisu }}
+        run: |
+          chmod +x builder-scripts/build.sh
+          builder-scripts/build.sh
+
+      - name: Rename Files
+        run: |
+          cd out/
+          for file in *.zip *.img; do
+            if [ -f "$file" ]; then
+              mv "$file" "【${{ matrix.device.device_name }}】【${{ matrix.variation.name }}】$file"
+            fi
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.device.device_name }}-${{ matrix.variation.name }}-Artifacts
+          path: |
+            out/*.zip
+            out/*.img
+
+  release:
+    needs: [prepare-matrix, build]
+    if: ${{ github.event.inputs.create_release == 'true' || github.event_name == 'repository_dispatch' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        device: ${{ fromJSON(needs.prepare-matrix.outputs.devices) }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "${{ matrix.device.device_name }}-*-Artifacts"
+          merge-multiple: true
+          path: release-files/
+
+      - name: Fetch Base Kernel Changelog
+        id: changelog
+        run: |
+          git clone --depth 10 https://github.com/${{ matrix.device.kernel_repo }}.git -b main base-repo
+          cd base-repo
+          LOG=$(git log -5 --pretty=format:"- %s (\`%h\`)")
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "log<<$EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "$EOF" >> $GITHUB_OUTPUT
+          cd ..
+          rm -rf base-repo
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          repository: ${{ matrix.device.release_repo }}
+          files: release-files/*
+          tag_name: Build_${{ github.run_number }}
+          name: '${{ matrix.device.device_name }} Kernel Release (Build ${{ github.run_number }})'
+          body: |
+            ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ github.run_number }}
+            包含原版、SukiSU-Ultra、ReSukiSU变种。
+            
+            **更新记录：**
+            ${{ steps.changelog.outputs.log }}
+          prerelease: ${{ github.event.inputs.is_pre_release || false }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TRIGGER_PAT }}

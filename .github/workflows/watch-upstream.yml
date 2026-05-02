@@ -1,0 +1,85 @@
+name: Watch Upstream Updates
+
+on:
+  schedule:
+    - cron: '0 */24 * * *' 
+  workflow_dispatch:
+
+jobs:
+  discover-and-update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write 
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }} 
+
+      - run: sudo apt-get install -y jq
+
+      - id: discover
+        run: |
+          STATE_FILE="upstream_commits.json"
+          [ ! -f "$STATE_FILE" ] && echo "{}" > "$STATE_FILE"
+
+          S_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra.git"
+          S_LATEST=$(git ls-remote "$S_URL" "builtin" | cut -f1)
+          S_KNOWN=$(jq -r '.sukisu_ultra // empty' "$STATE_FILE")
+
+          R_URL="https://github.com/ReSukiSU/ReSukiSU.git"
+          R_LATEST=$(git ls-remote "$R_URL" "main" | cut -f1)
+          R_KNOWN=$(jq -r '.resukisu // empty' "$STATE_FILE")
+
+          [ -z "$S_LATEST" ] || [ -z "$R_LATEST" ] && exit 1
+
+          NEW_UPDATES=false
+          COMMIT_MSG="chore: Update upstreams"
+
+          if [ "$S_LATEST" != "$S_KNOWN" ]; then
+            NEW_UPDATES=true
+            COMMIT_MSG="$COMMIT_MSG (SukiSU-Ultra: ${S_LATEST:0:7})"
+          fi
+
+          if [ "$R_LATEST" != "$R_KNOWN" ]; then
+            NEW_UPDATES=true
+            COMMIT_MSG="$COMMIT_MSG (ReSukiSU: ${R_LATEST:0:7})"
+          fi
+
+          if [ "$NEW_UPDATES" = true ]; then
+            echo "new_commit_found=true" >> $GITHUB_OUTPUT
+            echo "s_latest=$S_LATEST" >> $GITHUB_OUTPUT
+            echo "r_latest=$R_LATEST" >> $GITHUB_OUTPUT
+            echo "commit_msg=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          fi
+          
+      - id: update_commit
+        if: steps.discover.outputs.new_commit_found == 'true'
+        run: |
+          STATE_FILE="upstream_commits.json"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase
+          
+          [ ! -f "$STATE_FILE" ] && echo "{}" > "$STATE_FILE"
+          
+          jq --arg S_COMMIT "${{ steps.discover.outputs.s_latest }}" \
+             --arg R_COMMIT "${{ steps.discover.outputs.r_latest }}" \
+             '.sukisu_ultra = $S_COMMIT | .resukisu = $R_COMMIT' \
+             "$STATE_FILE" > tmp.json && mv tmp.json "$STATE_FILE"
+          
+          git add "$STATE_FILE"
+          git commit -m "${{ steps.discover.outputs.commit_msg }}"
+          git push
+          
+          echo "pushed=true" >> $GITHUB_OUTPUT
+
+      - if: steps.update_commit.outputs.pushed == 'true'
+        run: |
+          response_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Authorization: token ${{ secrets.WORKFLOW_TRIGGER_PAT }}" \
+            "https://api.github.com/repos/${{ github.repository }}/dispatches" \
+            --data '{"event_type": "upstream_update"}')
+          
+          [ "$response_code" -ne 204 ] && exit 1

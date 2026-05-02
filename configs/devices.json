@@ -1,0 +1,17 @@
+[
+  {
+    "device_name": "S24_Ultra",
+    "kernel_repo": "Voisterouslife/android_kernel_samsung_sm8650",
+    "release_repo": "Voisterouslife/android_kernel_samsung_sm8650",
+    "anykernel_repo": "https://github.com/Voisterouslife/AnyKernel3.git",
+    "toolchain_url_1": "https://github.com/Voisterouslife/android_kernel_samsung_sm8650/releases/download/toolchain/toolchain.tar.gz.00",
+    "toolchain_url_2": "https://github.com/Voisterouslife/android_kernel_samsung_sm8650/releases/download/toolchain/toolchain.tar.gz.01",
+    "clang_version": "clang-r487747c",
+    "defconfig": "pineapple_gki_defconfig",
+    "localversion": "-Elaina-Happy_Every_Day",
+    "zip_prefix": "S24_kernel",
+    "kernel_image_name": "Image", 
+    "need_baseband_guard": "true",
+    "is_boot_lz4": "true"
+  }
+]
