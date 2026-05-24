@@ -170,6 +170,7 @@ jobs:
 
       - uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }} 
           repository: ${{ matrix.device.release_repo }}
           files: release-files/*
           tag_name: Build_${{ github.run_number }}
@@ -181,5 +182,4 @@ jobs:
             **更新记录：**
             ${{ steps.changelog.outputs.log }}
           prerelease: ${{ github.event.inputs.is_pre_release || false }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.WORKFLOW_TRIGGER_PAT }}
+          
