@@ -101,6 +101,11 @@ jobs:
             wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           fi
 
+      - name: Fix USER_ARG_NULL for SukiSU-Ultra
+        if: ${{ matrix.variation.enable_sukisuultra == 'true' }}
+        run: |
+          sed -i 's/#define USER_ARG_NULL ((struct user_arg_ptr){ 0 })/#define USER_ARG_NULL NULL/' drivers/kernelsu/sulog/event.c
+
       - name: Build Kernel
         env:
           CLANG_VERSION: ${{ matrix.device.clang_version }}
