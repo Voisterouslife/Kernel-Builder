@@ -1,5 +1,5 @@
 name: Universal Kernel Builder
-run-name: Universal Kernel Builder Build #${{ github.run_number }}
+run-name: "Universal Kernel Builder Build #${{ github.run_number }}"
 
 on:
   workflow_dispatch:
@@ -37,7 +37,7 @@ jobs:
     permissions:
       contents: write
     strategy:
-      fail-fast: false 
+      fail-fast: false
       matrix:
         device: ${{ fromJSON(needs.prepare-matrix.outputs.devices) }}
         variation:
@@ -48,8 +48,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ matrix.device.kernel_repo }}
-          ref: ${{ matrix.variation.branch }} 
+          ref: ${{ matrix.variation.branch }}
           fetch-depth: 1
+          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }}
 
       - uses: actions/checkout@v4
         with:
@@ -87,7 +88,7 @@ jobs:
           export CCACHE_COMPRESS=1
           export CCACHE_MAXSIZE=15G
           ccache -M 15G
-          ccache -z 
+          ccache -z
 
       - name: Setup Kernel Mods
         run: |
@@ -96,7 +97,7 @@ jobs:
           elif [ "${{ matrix.variation.enable_resukisu }}" == "true" ]; then
             curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
           fi
-          
+
           if [ "${{ matrix.device.need_baseband_guard }}" == "true" ]; then
             wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
           fi
@@ -155,22 +156,9 @@ jobs:
           merge-multiple: true
           path: release-files/
 
-      - name: Fetch Base Kernel Changelog
-        id: changelog
-        run: |
-          git clone --depth 10 https://github.com/${{ matrix.device.kernel_repo }}.git -b main base-repo
-          cd base-repo
-          LOG=$(git log -5 --pretty=format:"- %s (\`%h\`)")
-          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
-          echo "log<<$EOF" >> $GITHUB_OUTPUT
-          echo "$LOG" >> $GITHUB_OUTPUT
-          echo "$EOF" >> $GITHUB_OUTPUT
-          cd ..
-          rm -rf base-repo
-
       - uses: softprops/action-gh-release@v2
         with:
-          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }} 
+          token: ${{ secrets.WORKFLOW_TRIGGER_PAT }}
           repository: ${{ matrix.device.release_repo }}
           files: release-files/*
           tag_name: Build_${{ github.run_number }}
@@ -178,8 +166,9 @@ jobs:
           body: |
             ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ github.run_number }}
             包含原版、SukiSU-Ultra、ReSukiSU变种。
-            
-            **更新记录：**
-            ${{ steps.changelog.outputs.log }}
+            - **【Original】**: 原版内核
+            - **【SukiSU-Ultra】**: 集成 SukiSU-Ultra
+            - **【ReSukiSU】**: 集成 ReSukiSU
+
+            *默认均已集成 Baseband-guard 支持。*
           prerelease: ${{ github.event.inputs.is_pre_release || false }}
-          
