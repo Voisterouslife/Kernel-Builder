@@ -141,7 +141,7 @@ jobs:
   release:
     name: Release ${{ matrix.device.device_name }}
     needs: [prepare-matrix, build]
-    if: ${{ github.event.inputs.create_release == 'true' || github.event_name == 'repository_dispatch' }}
+    if: ${{ github.event.inputs.create_release == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
