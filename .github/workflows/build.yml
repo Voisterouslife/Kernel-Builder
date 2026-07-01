@@ -165,7 +165,7 @@ jobs:
           name: '${{ matrix.device.device_name }} Kernel Release (Build ${{ github.run_number }})'
           body: |
             ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ github.run_number }}
-            包含原版、SukiSU-Ultra、ReSukiSU变种。
+            本 Release 包含以下多个版本的内核镜像及刷机包，请根据文件前缀按需下载：
             - **【Original】**: 原版内核
             - **【SukiSU-Ultra】**: 集成 SukiSU-Ultra
             - **【ReSukiSU】**: 集成 ReSukiSU
