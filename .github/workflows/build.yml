@@ -168,6 +168,8 @@ jobs:
           repository: ${{ matrix.device.release_repo }}
           files: release-files/*
           tag_name: Build_${{ github.run_number }}
+          target_commitish: SukiSU
+          make_latest: "true"
           name: '${{ matrix.device.device_name }} Kernel Release (Build ${{ github.run_number }})'
           body: |
             ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ github.run_number }}
