@@ -162,17 +162,23 @@ jobs:
           merge-multiple: true
           path: release-files/
 
+      - name: Format Run Number
+        id: format_run
+        run: |
+          FORMATTED_RUN=$(printf "%05d" "${{ github.run_number }}")
+          echo "tag_run=${FORMATTED_RUN}" >> $GITHUB_OUTPUT
+
       - uses: softprops/action-gh-release@v2
         with:
           token: ${{ secrets.WORKFLOW_TRIGGER_PAT }}
           repository: ${{ matrix.device.release_repo }}
           files: release-files/*
-          tag_name: Build_${{ github.run_number }}
+          tag_name: Build_${{ steps.format_run.outputs.tag_run }}
           target_commitish: SukiSU
           make_latest: "true"
-          name: '${{ matrix.device.device_name }} Kernel Release (Build ${{ github.run_number }})'
+          name: '${{ matrix.device.device_name }} Kernel Release (Build ${{ steps.format_run.outputs.tag_run }})'
           body: |
-            ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ github.run_number }}
+            ### 🚀 ${{ matrix.device.device_name }} Auto Build #${{ steps.format_run.outputs.tag_run }}
             本 Release 包含以下多个版本的内核镜像及刷机包，请根据文件前缀按需下载：
             - **【Original】**: 原版内核
             - **【SukiSU-Ultra】**: 集成 SukiSU-Ultra
