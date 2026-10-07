@@ -95,7 +95,7 @@ jobs:
           if [ "${{ matrix.variation.enable_sukisuultra }}" == "true" ]; then
             curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s builtin
           elif [ "${{ matrix.variation.enable_resukisu }}" == "true" ]; then
-            curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash -s main
+            curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash -s main
           fi
 
           if [ "${{ matrix.device.need_baseband_guard }}" == "true" ]; then
